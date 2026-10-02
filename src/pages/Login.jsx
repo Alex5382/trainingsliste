@@ -19,9 +19,9 @@ export default function Login() {
     <div className="login">
       <form className="card" onSubmit={submit}>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <img src="icons/icon.svg" alt="" width="72" height="72" />
+          <img src="icons/wappen.png" alt="TSV Öschelbronn" width="88" style={{ height: 'auto' }} />
           <h1 style={{ marginTop: 8 }}>Trainingsliste</h1>
-          <p className="muted small">Kinder- & Jugendturnen 2</p>
+          <p className="muted small">TSV Öschelbronn · Abt. Turnen<br />Kinder- & Jugendturnen 2</p>
         </div>
         <label className="field"><span>E-Mail</span><input type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required /></label>
         <label className="field"><span>Passwort</span><input type="password" autoComplete="current-password" value={pw} onChange={e => setPw(e.target.value)} required /></label>
