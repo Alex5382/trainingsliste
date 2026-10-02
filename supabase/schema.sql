@@ -17,11 +17,13 @@ create table if not exists personen (
   letztes_training text,
   notfallkontakt  text,           -- Name + Nummer, z. B. "Mama Sabine 0171 …"
   adresse         text,
+  dabei_seit      date,           -- seit wann in der Gruppe (frei änderbar)
   updated_at      timestamptz not null default now()
 );
 -- Nachrüsten, falls die Tabelle schon ohne diese Spalten existiert:
 alter table personen add column if not exists notfallkontakt text;
 alter table personen add column if not exists adresse text;
+alter table personen add column if not exists dabei_seit date;
 
 -- Ein Trainingstag (Datum eindeutig)
 create table if not exists trainingstage (
