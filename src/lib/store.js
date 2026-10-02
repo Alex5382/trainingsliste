@@ -149,9 +149,20 @@ export async function refresh() {
   setState({ syncing: true, error: null })
   try {
     const data = emptyData()
+    // Supabase liefert höchstens 1000 Zeilen pro Abfrage → seitenweise nachladen
+    const PAGE = 1000
     for (const table of Object.keys(TABLES)) {
-      const { data: rows, error } = await supabase.from(table).select('*').limit(20000)
-      if (error) throw error
+      const order = TABLES[table]
+      let rows = [], from = 0
+      while (true) {
+        let q = supabase.from(table).select('*')
+        for (const col of order) q = q.order(col)
+        const { data: chunk, error } = await q.range(from, from + PAGE - 1)
+        if (error) throw error
+        rows = rows.concat(chunk)
+        if (chunk.length < PAGE) break
+        from += PAGE
+      }
       data[table] = rows
     }
     setState({ data, lastSync: new Date().toISOString(), online: true })
