@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStore, upsert, remove, newId } from '../lib/store'
-import { byVorname, fullName, fmtDate, age } from '../lib/util'
+import { byVorname, fullName, fmtDate, age, todayISO } from '../lib/util'
 import { Sheet, Field, confirmDialog } from '../components/ui'
 
 // aus "Mama Sabine 0171 123 4567 / 07032…" die erste Nummer herausziehen
@@ -63,25 +63,45 @@ export default function Personen() {
         {list.length === 0 && <div className="empty">Niemand gefunden.</div>}
       </div>
 
-      {edit && <PersonSheet p={edit} onClose={() => setEdit(null)} />}
+      {edit && <PersonSheet p={edit} onClose={() => setEdit(null)} lastX={lastTrainingOf(edit.id, data)} />}
     </>
   )
 }
 
-function PersonSheet({ p, onClose }) {
+// Datum des letzten Trainings, an dem die Person "da" war (sonst letzter Eintrag überhaupt)
+function lastTrainingOf(pid, data) {
+  if (!pid) return null
+  const tage = new Map(data.trainingstage.map(t => [t.id, t.datum]))
+  let last = null, lastAny = null
+  for (const a of data.anwesenheit) {
+    if (a.person_id !== pid) continue
+    const d = tage.get(a.trainingstag_id); if (!d) continue
+    if (!lastAny || d > lastAny) lastAny = d
+    if (a.status === 'X' && (!last || d > last)) last = d
+  }
+  return last || lastAny
+}
+
+function PersonSheet({ p, onClose, lastX }) {
   const [f, setF] = useState({
     vorname: '', nachname: '', geburtsdatum: '', rolle: 'turnerin', status: 'aktiv',
-    telefon: '', email: '', notfallkontakt: '', adresse: '', bemerkung: '', letztes_training: '', ...p,
+    telefon: '', email: '', notfallkontakt: '', adresse: '', bemerkung: '', letztes_training: '',
+    dabei_seit: p.id ? '' : todayISO(), ...p,
   })
   const set = (k, v) => setF(s => ({ ...s, [k]: v }))
   const isNew = !p.id
+  // Wechsel auf "ehemalig": letztes Training vorbelegen (bleibt editierbar)
+  function setStatus(st) {
+    setF(s => ({ ...s, status: st,
+      letztes_training: st === 'ehemalig' && !s.letztes_training ? fmtDate(lastX || todayISO()) : s.letztes_training }))
+  }
   function save() {
     if (!f.vorname.trim()) return
     upsert('personen', {
       id: p.id || newId(), vorname: f.vorname.trim(), nachname: (f.nachname || '').trim(),
       geburtsdatum: f.geburtsdatum || null, rolle: f.rolle, status: f.status,
       telefon: f.telefon || null, email: f.email || null, notfallkontakt: f.notfallkontakt || null, adresse: f.adresse || null,
-      bemerkung: f.bemerkung || null, letztes_training: f.letztes_training || null,
+      bemerkung: f.bemerkung || null, letztes_training: f.letztes_training || null, dabei_seit: f.dabei_seit || null,
     })
     onClose()
   }
@@ -96,7 +116,10 @@ function PersonSheet({ p, onClose }) {
         <Field label="Vorname"><input value={f.vorname} onChange={e => set('vorname', e.target.value)} autoFocus={isNew} /></Field>
         <Field label="Nachname"><input value={f.nachname || ''} onChange={e => set('nachname', e.target.value)} /></Field>
       </div>
-      <Field label="Geburtsdatum"><input type="date" value={f.geburtsdatum || ''} onChange={e => set('geburtsdatum', e.target.value)} /></Field>
+      <div className="grid2">
+        <Field label="Geburtsdatum"><input type="date" value={f.geburtsdatum || ''} onChange={e => set('geburtsdatum', e.target.value)} /></Field>
+        <Field label="Dabei seit"><input type="date" value={f.dabei_seit || ''} onChange={e => set('dabei_seit', e.target.value)} /></Field>
+      </div>
       <Field label="Rolle">
         <div className="chips">
           <button className={`chip ${f.rolle === 'turnerin' ? 'on' : ''}`} onClick={() => set('rolle', 'turnerin')}>Turnerin</button>
@@ -106,7 +129,7 @@ function PersonSheet({ p, onClose }) {
       <Field label="Status">
         <div className="chips">
           {[['aktiv', 'Aktiv'], ['warteliste', 'Warteliste'], ['ehemalig', 'Ehemalig']].map(([k, l]) => (
-            <button key={k} className={`chip ${f.status === k ? 'on' : ''}`} onClick={() => set('status', k)}>{l}</button>
+            <button key={k} className={`chip ${f.status === k ? 'on' : ''}`} onClick={() => setStatus(k)}>{l}</button>
           ))}
         </div>
       </Field>
@@ -115,7 +138,7 @@ function PersonSheet({ p, onClose }) {
       <Field label="Notfallkontakt (Name + Nummer)"><input type="tel" value={f.notfallkontakt || ''} onChange={e => set('notfallkontakt', e.target.value)} placeholder="z. B. Mama Sabine 0171 1234567" /></Field>
       <Field label="Adresse (optional)"><input value={f.adresse || ''} onChange={e => set('adresse', e.target.value)} /></Field>
       {f.notfallkontakt && /\d{4}/.test(f.notfallkontakt) && <p className="small"><a href={`tel:${telHref(f.notfallkontakt)}`}>Notfallkontakt anrufen</a></p>}
-      {f.status === 'ehemalig' && <Field label="Letztes Training"><input value={f.letztes_training || ''} onChange={e => set('letztes_training', e.target.value)} placeholder="z. B. Juli 2025" /></Field>}
+      {f.status === 'ehemalig' && <Field label="Letztes Training"><input value={f.letztes_training || ''} onChange={e => set('letztes_training', e.target.value)} placeholder="z. B. Juli 2025" /><span className="muted small">Vorbelegt mit dem letzten Training, an dem sie da war – kann geändert werden.</span></Field>}
       <Field label="Bemerkung"><textarea value={f.bemerkung || ''} onChange={e => set('bemerkung', e.target.value)} /></Field>
       {f.email && <p className="small"><a href={`mailto:${f.email}`}>E-Mail schreiben</a></p>}
     </Sheet>

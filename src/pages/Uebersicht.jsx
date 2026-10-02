@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../lib/store'
-import { byVorname, fullName, fmtShort, fmtDate, seasonOf, seasonLabel } from '../lib/util'
+import { useStore, upsert, remove, newId } from '../lib/store'
+import { byVorname, fullName, fmtShort, fmtDate, seasonOf, seasonLabel, nextFriday } from '../lib/util'
 import { Empty } from '../components/ui'
 
 const ALLE = 'alle'
@@ -15,6 +15,8 @@ export default function Uebersicht() {
   const [season, setSeason] = useState(() => seasons[0])
   const [view, setView] = useState('matrix')
   const [sort, setSort] = useState('name')
+  const [bearbeiten, setBearbeiten] = useState(false)
+  const [neuDatum, setNeuDatum] = useState(nextFriday())
   const sel = season === ALLE ? ALLE : (seasons.includes(season) ? season : seasons[0])
 
   const tage = useMemo(() => data.trainingstage
@@ -56,18 +58,31 @@ export default function Uebersicht() {
     .sort((a, b) => rolleFirst(a, b) || byVorname(a, b)), [data.personen, marks, sel, seasons])
 
   const sorted = useMemo(() => {
-    const g = p => stats.get(p.id) || { x: 0, e: 0, f: 0, quote: -1, first: '' }
+    const g = p => ({ ...(stats.get(p.id) || { x: 0, e: 0, f: 0, quote: -1, first: '' }), seit: p.dabei_seit || stats.get(p.id)?.first || '' })
     const cmp = {
       name: byVorname,
       da: (a, b) => g(b).x - g(a).x || byVorname(a, b),
       quote: (a, b) => g(b).quote - g(a).quote || byVorname(a, b),
       fehlt: (a, b) => g(b).f - g(a).f || g(b).e - g(a).e || byVorname(a, b),
-      seit: (a, b) => (g(b).first || '').localeCompare(g(a).first || '') || byVorname(a, b),
+      seit: (a, b) => g(b).seit.localeCompare(g(a).seit) || byVorname(a, b),
     }[sort]
     return [...personen].sort((a, b) => rolleFirst(a, b) || cmp(a, b))
   }, [personen, stats, sort])
 
   if (seasons.length === 0) return <Empty>Noch keine Trainingstage vorhanden.</Empty>
+
+  function addTag() {
+    if (!neuDatum) return
+    if (data.trainingstage.some(t => t.datum === neuDatum)) return
+    upsert('trainingstage', { id: newId(), datum: neuDatum, ausgefallen: false, grund: null, notiz: null })
+    const s = seasonOf(neuDatum); if (s !== sel) setSeason(s)
+  }
+
+  // Nachtragen: gezielte Auswahl per Dropdown statt Durchtippen
+  function setCell(p, t, value) {
+    if (value) upsert('anwesenheit', { trainingstag_id: t.id, person_id: p.id, status: value })
+    else remove('anwesenheit', { trainingstag_id: t.id, person_id: p.id })
+  }
 
   const sumTag = tid => data.personen.filter(p => p.rolle === 'turnerin' && marks.get(p.id)?.get(tid) === 'X').length
   const stattgefunden = tage.filter(t => !t.ausgefallen).length
@@ -89,7 +104,21 @@ export default function Uebersicht() {
         <div className="chips" style={{ marginTop: 12 }}>
           <button className={`chip ${view === 'matrix' ? 'on' : ''}`} onClick={() => setView('matrix')}>Liste</button>
           <button className={`chip ${view === 'summe' ? 'on' : ''}`} onClick={() => setView('summe')}>Zusammenfassung</button>
+          {view === 'matrix' && (
+            <button className={`chip ${bearbeiten ? 'on' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => setBearbeiten(b => !b)}>
+              {bearbeiten ? 'Fertig' : 'Nachtragen'}
+            </button>
+          )}
         </div>
+        {bearbeiten && (
+          <>
+            <p className="small" style={{ margin: '10px 0 8px', color: 'var(--accent)' }}>Nachtragen: Kästchen antippen und Wert auswählen (· = leer). Fehlende Trainingstage hier anlegen:</p>
+            <div className="row">
+              <input type="date" value={neuDatum} onChange={e => setNeuDatum(e.target.value)} aria-label="Datum neuer Trainingstag" />
+              <button className="btn secondary" onClick={addTag} disabled={!neuDatum || data.trainingstage.some(t => t.datum === neuDatum)}>Tag anlegen</button>
+            </div>
+          </>
+        )}
       </div>
 
       {view === 'matrix' && (
@@ -111,6 +140,16 @@ export default function Uebersicht() {
                     <td>{s.x}</td><td>{s.e}</td><td>{s.f}</td>
                     {tage.map(t => {
                       const v = marks.get(p.id)?.get(t.id)
+                      if (bearbeiten) {
+                        return (
+                          <td key={t.id} className={`c ${v === '-' ? 'F' : (v || '')}`} style={{ padding: 2 }}>
+                            <select className="cell" value={v || ''} onChange={e => setCell(p, t, e.target.value)}
+                              aria-label={`${fullName(p)} am ${fmtDate(t.datum)}`}>
+                              <option value="">·</option><option value="X">X</option><option value="E">E</option><option value="-">–</option>
+                            </select>
+                          </td>
+                        )
+                      }
                       return <td key={t.id} className={`c ${v === '-' ? 'F' : (v || '')}`}>{v === '-' ? '–' : (v || '')}</td>
                     })}
                   </tr>
@@ -147,7 +186,7 @@ export default function Uebersicht() {
                       {p.status !== 'aktiv' && <span className="badge warn" style={{ marginLeft: 6 }}>{p.status}</span>}
                     </div>
                     <div className="meta">
-                      {s ? <>dabei seit {fmtDate(s.first)} · zuletzt da {s.lastX ? fmtDate(s.lastX) : '–'}</> : 'noch kein Eintrag'}
+                      {(p.dabei_seit || s) ? <>dabei seit {fmtDate(p.dabei_seit || s.first)}{s ? <> · zuletzt da {s.lastX ? fmtDate(s.lastX) : '–'}</> : ' · noch kein Eintrag'}</> : 'noch kein Eintrag'}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -161,7 +200,7 @@ export default function Uebersicht() {
             })}
           </div>
           <p className="muted small" style={{ padding: '8px 4px' }}>
-            Grün da, gelb entschuldigt, rot gefehlt. Quote = Anteil „da“ an allen Einträgen des Mädels. „Dabei seit“ ist der erste Eintrag im gewählten Zeitraum.
+            Grün da, gelb entschuldigt, rot gefehlt. Quote = Anteil „da“ an allen Einträgen des Mädels. „Dabei seit“ ist das bei der Person hinterlegte Datum, sonst der erste Eintrag im gewählten Zeitraum.
           </p>
         </>
       )}
