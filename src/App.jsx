@@ -38,9 +38,10 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar row">
+        <img className="wappen" src="icons/wappen.png" alt="TSV Öschelbronn" />
         <div className="grow">
           <h1 style={{ fontSize: 17 }}>Trainingsliste</h1>
-          <div className="sub">Kinder- & Jugendturnen 2 · freitags 16:30–18:30</div>
+          <div className="sub">TSV Öschelbronn · Turnen</div>
         </div>
         <div className="small" title={online ? 'Verbunden' : 'Offline'} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span className="status-dot" style={{ background: !online ? '#F5B82E' : syncing ? '#9DBBE6' : '#6FD39A' }} />
