@@ -9,13 +9,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon.svg'],
+      includeAssets: ['icons/wappen.png', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Trainingsliste Turnen',
+        name: 'Trainingsliste TSV Öschelbronn',
         short_name: 'Training',
         description: 'Anwesenheit, P-Übungen und Vereinsmeisterschaft',
         lang: 'de',
-        theme_color: '#1E4D8C',
+        theme_color: '#164194',
         background_color: '#F3F4F6',
         display: 'standalone',
         orientation: 'portrait',
