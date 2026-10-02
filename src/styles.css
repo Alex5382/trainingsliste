@@ -154,3 +154,12 @@ table.matrix { border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .empty { padding: 32px 16px; text-align: center; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) { .sheet { animation: up .18s ease-out; } }
 @keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Dropdown in der Matrix (Nachtragen) */
+.matrix select.cell {
+  width: 40px; min-height: 36px; padding: 0; text-align: center; border-radius: 8px; font-weight: 700;
+  background: #fff; appearance: none; -webkit-appearance: none;
+}
+.matrix td.c.X select.cell { background: var(--soft-ok); color: var(--ok); border-color: var(--ok); }
+.matrix td.c.E select.cell { background: var(--soft-warn); color: var(--warn); border-color: var(--warn); }
+.matrix td.c.F select.cell { background: var(--soft-bad); color: var(--bad); border-color: var(--bad); }
